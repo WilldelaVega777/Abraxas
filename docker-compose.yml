@@ -1,22 +1,22 @@
 # Docker Compose profiles:
-# - Default (no profile): Starts archon-server, archon-mcp, and archon-frontend
-# - Agents are opt-in: archon-agents starts only with the "agents" profile
+# - Default (no profile): Starts abraxas-server, abraxas-mcp, and abraxas-frontend
+# - Agents are opt-in: abraxas-agents starts only with the "agents" profile
 # Usage:
 #   docker compose up                        # Starts server, mcp, frontend (agents disabled)
-#   docker compose --profile agents up -d    # Also starts archon-agents
+#   docker compose --profile agents up -d    # Also starts abraxas-agents
 
 services:
   # Server Service (FastAPI + Socket.IO + Crawling)
-  archon-server:
+  abraxas-server:
     build:
       context: ./python
       dockerfile: Dockerfile.server
       args:
         BUILDKIT_INLINE_CACHE: 1
-        ARCHON_SERVER_PORT: ${ARCHON_SERVER_PORT:-8181}
-    container_name: archon-server
+        ARCHON_SERVER_PORT: ${ARCHON_SERVER_PORT:-9191}
+    container_name: abraxas-server
     ports:
-      - "${ARCHON_SERVER_PORT:-8181}:${ARCHON_SERVER_PORT:-8181}"
+      - "${ARCHON_SERVER_PORT:-9191}:${ARCHON_SERVER_PORT:-9191}"
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
@@ -24,10 +24,10 @@ services:
       - LOGFIRE_TOKEN=${LOGFIRE_TOKEN:-}
       - SERVICE_DISCOVERY_MODE=docker_compose
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - ARCHON_SERVER_PORT=${ARCHON_SERVER_PORT:-8181}
-      - ARCHON_MCP_PORT=${ARCHON_MCP_PORT:-8051}
-      - ARCHON_AGENTS_PORT=${ARCHON_AGENTS_PORT:-8052}
-      - AGENT_WORK_ORDERS_PORT=${AGENT_WORK_ORDERS_PORT:-8053}
+      - ARCHON_SERVER_PORT=${ARCHON_SERVER_PORT:-9191}
+      - ARCHON_MCP_PORT=${ARCHON_MCP_PORT:-9051}
+      - ARCHON_AGENTS_PORT=${ARCHON_AGENTS_PORT:-9052}
+      - AGENT_WORK_ORDERS_PORT=${AGENT_WORK_ORDERS_PORT:-9053}
       - AGENTS_ENABLED=${AGENTS_ENABLED:-false}
       - ARCHON_HOST=${HOST:-localhost}
     networks:
@@ -53,7 +53,7 @@ services:
         "--host",
         "0.0.0.0",
         "--port",
-        "${ARCHON_SERVER_PORT:-8181}",
+        "${ARCHON_SERVER_PORT:-9191}",
         "--reload",
       ]
     healthcheck:
@@ -62,7 +62,7 @@ services:
           "CMD",
           "sh",
           "-c",
-          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:${ARCHON_SERVER_PORT:-8181}/health'')"',
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:${ARCHON_SERVER_PORT:-9191}/health'')"',
         ]
       interval: 30s
       timeout: 10s
@@ -70,16 +70,16 @@ services:
       start_period: 40s
 
   # Lightweight MCP Server Service (HTTP-based)
-  archon-mcp:
+  abraxas-mcp:
     build:
       context: ./python
       dockerfile: Dockerfile.mcp
       args:
         BUILDKIT_INLINE_CACHE: 1
-        ARCHON_MCP_PORT: ${ARCHON_MCP_PORT:-8051}
-    container_name: archon-mcp
+        ARCHON_MCP_PORT: ${ARCHON_MCP_PORT:-9051}
+    container_name: abraxas-mcp
     ports:
-      - "${ARCHON_MCP_PORT:-8051}:${ARCHON_MCP_PORT:-8051}"
+      - "${ARCHON_MCP_PORT:-9051}:${ARCHON_MCP_PORT:-9051}"
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
@@ -88,16 +88,16 @@ services:
       - TRANSPORT=sse
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       # MCP needs to know where to find other services
-      - API_SERVICE_URL=http://archon-server:${ARCHON_SERVER_PORT:-8181}
+      - API_SERVICE_URL=http://abraxas-server:${ARCHON_SERVER_PORT:-9191}
       - AGENTS_ENABLED=${AGENTS_ENABLED:-false}
-      - AGENTS_SERVICE_URL=${AGENTS_SERVICE_URL:-http://archon-agents:${ARCHON_AGENTS_PORT:-8052}}
-      - ARCHON_MCP_PORT=${ARCHON_MCP_PORT:-8051}
-      - ARCHON_SERVER_PORT=${ARCHON_SERVER_PORT:-8181}
-      - ARCHON_AGENTS_PORT=${ARCHON_AGENTS_PORT:-8052}
+      - AGENTS_SERVICE_URL=${AGENTS_SERVICE_URL:-http://abraxas-agents:${ARCHON_AGENTS_PORT:-9052}}
+      - ARCHON_MCP_PORT=${ARCHON_MCP_PORT:-9051}
+      - ARCHON_SERVER_PORT=${ARCHON_SERVER_PORT:-9191}
+      - ARCHON_AGENTS_PORT=${ARCHON_AGENTS_PORT:-9052}
     networks:
       - app-network
     depends_on:
-      archon-server:
+      abraxas-server:
         condition: service_healthy
       
     extra_hosts:
@@ -108,7 +108,7 @@ services:
           "CMD",
           "sh",
           "-c",
-          'python -c "import socket; s=socket.socket(); s.connect((''localhost'', ${ARCHON_MCP_PORT:-8051})); s.close()"',
+          'python -c "import socket; s=socket.socket(); s.connect((''localhost'', ${ARCHON_MCP_PORT:-9051})); s.close()"',
         ]
       interval: 30s
       timeout: 10s
@@ -116,7 +116,7 @@ services:
       start_period: 60s # Give dependencies time to start
 
   # AI Agents Service (ML/Reranking)
-  archon-agents:
+  abraxas-agents:
     profiles:
       - agents  # Only starts when explicitly using --profile agents
     build:
@@ -124,10 +124,10 @@ services:
       dockerfile: Dockerfile.agents
       args:
         BUILDKIT_INLINE_CACHE: 1
-        ARCHON_AGENTS_PORT: ${ARCHON_AGENTS_PORT:-8052}
-    container_name: archon-agents
+        ARCHON_AGENTS_PORT: ${ARCHON_AGENTS_PORT:-9052}
+    container_name: abraxas-agents
     ports:
-      - "${ARCHON_AGENTS_PORT:-8052}:${ARCHON_AGENTS_PORT:-8052}"
+      - "${ARCHON_AGENTS_PORT:-9052}:${ARCHON_AGENTS_PORT:-9052}"
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
@@ -135,8 +135,8 @@ services:
       - LOGFIRE_TOKEN=${LOGFIRE_TOKEN:-}
       - SERVICE_DISCOVERY_MODE=docker_compose
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - ARCHON_AGENTS_PORT=${ARCHON_AGENTS_PORT:-8052}
-      - ARCHON_SERVER_PORT=${ARCHON_SERVER_PORT:-8181}
+      - ARCHON_AGENTS_PORT=${ARCHON_AGENTS_PORT:-9052}
+      - ARCHON_SERVER_PORT=${ARCHON_SERVER_PORT:-9191}
     networks:
       - app-network
     healthcheck:
@@ -145,7 +145,7 @@ services:
           "CMD",
           "sh",
           "-c",
-          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:${ARCHON_AGENTS_PORT:-8052}/health'')"',
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:${ARCHON_AGENTS_PORT:-9052}/health'')"',
         ]
       interval: 30s
       timeout: 10s
@@ -153,7 +153,7 @@ services:
       start_period: 40s
 
   # Agent Work Orders Service (Independent microservice for workflow execution)
-  archon-agent-work-orders:
+  abraxas-agent-work-orders:
     profiles:
       - work-orders  # Only starts when explicitly using --profile work-orders
     build:
@@ -161,18 +161,18 @@ services:
       dockerfile: Dockerfile.agent-work-orders
       args:
         BUILDKIT_INLINE_CACHE: 1
-        AGENT_WORK_ORDERS_PORT: ${AGENT_WORK_ORDERS_PORT:-8053}
-    container_name: archon-agent-work-orders
+        AGENT_WORK_ORDERS_PORT: ${AGENT_WORK_ORDERS_PORT:-9053}
+    container_name: abraxas-agent-work-orders
     depends_on:
-      - archon-server
+      - abraxas-server
     ports:
-      - "${AGENT_WORK_ORDERS_PORT:-8053}:${AGENT_WORK_ORDERS_PORT:-8053}"
+      - "${AGENT_WORK_ORDERS_PORT:-9053}:${AGENT_WORK_ORDERS_PORT:-9053}"
     environment:
       - ENABLE_AGENT_WORK_ORDERS=true
       - SERVICE_DISCOVERY_MODE=docker_compose
       - STATE_STORAGE_TYPE=supabase
-      - ARCHON_SERVER_URL=http://archon-server:${ARCHON_SERVER_PORT:-8181}
-      - ARCHON_MCP_URL=http://archon-mcp:${ARCHON_MCP_PORT:-8051}
+      - ARCHON_SERVER_URL=http://abraxas-server:${ARCHON_SERVER_PORT:-9191}
+      - ARCHON_MCP_URL=http://abraxas-mcp:${ARCHON_MCP_PORT:-9051}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -180,7 +180,7 @@ services:
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
       - LOGFIRE_TOKEN=${LOGFIRE_TOKEN:-}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - AGENT_WORK_ORDERS_PORT=${AGENT_WORK_ORDERS_PORT:-8053}
+      - AGENT_WORK_ORDERS_PORT=${AGENT_WORK_ORDERS_PORT:-9053}
       - CLAUDE_CLI_PATH=${CLAUDE_CLI_PATH:-claude}
       - GH_CLI_PATH=${GH_CLI_PATH:-gh}
       - GH_TOKEN=${GITHUB_PAT_TOKEN}
@@ -197,7 +197,7 @@ services:
           "CMD",
           "python",
           "-c",
-          'import urllib.request; urllib.request.urlopen("http://localhost:${AGENT_WORK_ORDERS_PORT:-8053}/health")',
+          'import urllib.request; urllib.request.urlopen("http://localhost:${AGENT_WORK_ORDERS_PORT:-9053}/health")',
         ]
       interval: 30s
       timeout: 10s
@@ -205,16 +205,16 @@ services:
       start_period: 40s
 
   # Frontend
-  archon-frontend:
+  abraxas-frontend:
     build: ./archon-ui-main
-    container_name: archon-ui
+    container_name: abraxas-ui
     ports:
-      - "${ARCHON_UI_PORT:-3737}:3737"
+      - "${ARCHON_UI_PORT:-9090}:3737"
     environment:
       # Don't set VITE_API_URL so frontend uses relative URLs through proxy
-      # - VITE_API_URL=http://${HOST:-localhost}:${ARCHON_SERVER_PORT:-8181}
-      - VITE_ARCHON_SERVER_PORT=${ARCHON_SERVER_PORT:-8181}
-      - ARCHON_SERVER_PORT=${ARCHON_SERVER_PORT:-8181}
+      # - VITE_API_URL=http://${HOST:-localhost}:${ARCHON_SERVER_PORT:-9191}
+      - VITE_ARCHON_SERVER_PORT=${ARCHON_SERVER_PORT:-9191}
+      - ARCHON_SERVER_PORT=${ARCHON_SERVER_PORT:-9191}
       - HOST=${HOST:-localhost}
       - PROD=${PROD:-false}
       - VITE_ALLOWED_HOSTS=${VITE_ALLOWED_HOSTS:-}
@@ -231,7 +231,7 @@ services:
       - ./archon-ui-main/src:/app/src
       - ./archon-ui-main/public:/app/public
     depends_on:
-      archon-server:
+      abraxas-server:
         condition: service_healthy
 
 networks:

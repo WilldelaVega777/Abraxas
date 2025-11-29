@@ -12,18 +12,18 @@ import type { ConfigEnv, UserConfig } from 'vite';
 export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
   // Load environment variables
   const env = loadEnv(mode, process.cwd(), '');
-  
+
   // Get host and port from environment variables or use defaults
   // For internal Docker communication, use the service name
   // For external access, use the HOST from environment
   const isDocker = process.env.DOCKER_ENV === 'true' || existsSync('/.dockerenv');
-  const internalHost = 'archon-server';  // Docker service name for internal communication
+  const internalHost = 'abraxas-server';  // Docker service name for internal communication
   const externalHost = process.env.HOST || 'localhost';  // Host for external access
   // CRITICAL: For proxy target, always use internal host in Docker
   const proxyHost = isDocker ? internalHost : externalHost;
   const host = isDocker ? internalHost : externalHost;
-  const port = process.env.ARCHON_SERVER_PORT || env.ARCHON_SERVER_PORT || '8181';
-  
+  const port = process.env.ARCHON_SERVER_PORT || env.ARCHON_SERVER_PORT || '9191';
+
   return {
     plugins: [
       tailwindcss(),
@@ -39,8 +39,8 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
               console.log('[VITE] Serving coverage file:', filePath);
               try {
                 const data = await readFile(filePath);
-                const contentType = req.url.endsWith('.json') ? 'application/json' : 
-                                  req.url.endsWith('.html') ? 'text/html' : 'text/plain';
+                const contentType = req.url.endsWith('.json') ? 'application/json' :
+                  req.url.endsWith('.html') ? 'text/html' : 'text/plain';
                 res.setHeader('Content-Type', contentType);
                 res.end(data);
               } catch (err) {
@@ -52,7 +52,7 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
               next();
             }
           });
-          
+
           // Test execution endpoint (basic tests)
           server.middlewares.use('/api/run-tests', (req: any, res: any) => {
             if (req.method !== 'POST') {
@@ -78,12 +78,12 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
               const text = data.toString();
               // Split by newlines but preserve empty lines for better formatting
               const lines = text.split('\n');
-              
+
               lines.forEach((line: string) => {
                 // Send all lines including empty ones for proper formatting
                 res.write(`data: ${JSON.stringify({ type: 'output', message: line, timestamp: new Date().toISOString() })}\n\n`);
               });
-              
+
               // Flush the response to ensure immediate delivery
               if (res.flushHeaders) {
                 res.flushHeaders();
@@ -100,21 +100,21 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
             });
 
             testProcess.on('close', (code) => {
-              res.write(`data: ${JSON.stringify({ 
-                type: 'completed', 
-                exit_code: code, 
+              res.write(`data: ${JSON.stringify({
+                type: 'completed',
+                exit_code: code,
                 status: code === 0 ? 'completed' : 'failed',
                 message: code === 0 ? 'Tests completed and results generated!' : 'Tests failed',
-                timestamp: new Date().toISOString() 
+                timestamp: new Date().toISOString()
               })}\n\n`);
               res.end();
             });
 
             testProcess.on('error', (error) => {
-              res.write(`data: ${JSON.stringify({ 
-                type: 'error', 
-                message: error.message, 
-                timestamp: new Date().toISOString() 
+              res.write(`data: ${JSON.stringify({
+                type: 'error',
+                message: error.message,
+                timestamp: new Date().toISOString()
               })}\n\n`);
               res.end();
             });
@@ -148,14 +148,14 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
             if (!existsSync(testResultsDir)) {
               mkdirSync(testResultsDir, { recursive: true });
             }
-            
+
             const testProcess = exec('npm run test:coverage:stream', {
               cwd: process.cwd(),
-              env: { 
-                ...process.env, 
-                FORCE_COLOR: '1', 
+              env: {
+                ...process.env,
+                FORCE_COLOR: '1',
                 CI: 'true',
-                NODE_ENV: 'test' 
+                NODE_ENV: 'test'
               } // Enable color output and CI mode for cleaner output
             });
 
@@ -163,15 +163,15 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
               const text = data.toString();
               // Split by newlines but preserve empty lines for better formatting
               const lines = text.split('\n');
-              
+
               lines.forEach((line: string) => {
                 // Strip ANSI escape codes to get clean text
                 const cleanLine = line.replace(/\\x1b\[[0-9;]*m/g, '');
-                
+
                 // Send all lines for verbose reporter output
                 res.write(`data: ${JSON.stringify({ type: 'output', message: cleanLine, timestamp: new Date().toISOString() })}\n\n`);
               });
-              
+
               // Flush the response to ensure immediate delivery
               if (res.flushHeaders) {
                 res.flushHeaders();
@@ -188,21 +188,21 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
             });
 
             testProcess.on('close', (code) => {
-              res.write(`data: ${JSON.stringify({ 
-                type: 'completed', 
-                exit_code: code, 
+              res.write(`data: ${JSON.stringify({
+                type: 'completed',
+                exit_code: code,
                 status: code === 0 ? 'completed' : 'failed',
                 message: code === 0 ? 'Tests completed with coverage and results generated!' : 'Tests failed',
-                timestamp: new Date().toISOString() 
+                timestamp: new Date().toISOString()
               })}\n\n`);
               res.end();
             });
 
             testProcess.on('error', (error) => {
-              res.write(`data: ${JSON.stringify({ 
-                type: 'error', 
-                message: error.message, 
-                timestamp: new Date().toISOString() 
+              res.write(`data: ${JSON.stringify({
+                type: 'error',
+                message: error.message,
+                timestamp: new Date().toISOString()
               })}\n\n`);
               res.end();
             });
@@ -228,10 +228,10 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
               'Access-Control-Allow-Headers': 'Content-Type',
             });
 
-            res.write(`data: ${JSON.stringify({ 
-              type: 'status', 
-              message: 'Starting coverage generation...', 
-              timestamp: new Date().toISOString() 
+            res.write(`data: ${JSON.stringify({
+              type: 'status',
+              message: 'Starting coverage generation...',
+              timestamp: new Date().toISOString()
             })}\n\n`);
 
             // Run coverage generation
@@ -254,21 +254,21 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
             });
 
             coverageProcess.on('close', (code) => {
-              res.write(`data: ${JSON.stringify({ 
-                type: 'completed', 
-                exit_code: code, 
+              res.write(`data: ${JSON.stringify({
+                type: 'completed',
+                exit_code: code,
                 status: code === 0 ? 'completed' : 'failed',
                 message: code === 0 ? 'Coverage report generated successfully!' : 'Coverage generation failed',
-                timestamp: new Date().toISOString() 
+                timestamp: new Date().toISOString()
               })}\n\n`);
               res.end();
             });
 
             coverageProcess.on('error', (error) => {
-              res.write(`data: ${JSON.stringify({ 
-                type: 'error', 
-                message: error.message, 
-                timestamp: new Date().toISOString() 
+              res.write(`data: ${JSON.stringify({
+                type: 'error',
+                message: error.message,
+                timestamp: new Date().toISOString()
               })}\n\n`);
               res.end();
             });
@@ -282,42 +282,42 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
     ],
     server: {
       host: '0.0.0.0', // Listen on all network interfaces with explicit IP
-      port: parseInt(process.env.ARCHON_UI_PORT || env.ARCHON_UI_PORT || '3737'), // Use configurable port
+      port: parseInt(process.env.ARCHON_UI_PORT || env.ARCHON_UI_PORT || '9090'), // Use configurable port
       strictPort: true, // Exit if port is in use
       allowedHosts: (() => {
         const defaultHosts = ['localhost', '127.0.0.1', '::1'];
         const customHosts = env.VITE_ALLOWED_HOSTS?.trim()
           ? env.VITE_ALLOWED_HOSTS.split(',').map(h => h.trim()).filter(Boolean)
           : [];
-        const hostFromEnv = (process.env.HOST ?? env.HOST) && (process.env.HOST ?? env.HOST) !== 'localhost' 
-          ? [process.env.HOST ?? env.HOST] 
+        const hostFromEnv = (process.env.HOST ?? env.HOST) && (process.env.HOST ?? env.HOST) !== 'localhost'
+          ? [process.env.HOST ?? env.HOST]
           : [];
         return [...new Set([...defaultHosts, ...hostFromEnv, ...customHosts])];
       })(),
       proxy: (() => {
         const proxyConfig: Record<string, any> = {};
-        
+
         // Check if agent work orders service should be enabled
         // This can be disabled via environment variable to prevent hard dependency
         const agentWorkOrdersEnabled = env.AGENT_WORK_ORDERS_ENABLED !== 'false';
-        const agentWorkOrdersPort = env.AGENT_WORK_ORDERS_PORT || '8053';
-        
+        const agentWorkOrdersPort = env.AGENT_WORK_ORDERS_PORT || '9053';
+
         // Agent Work Orders API proxy (must come before general /api if enabled)
         if (agentWorkOrdersEnabled) {
           proxyConfig['/api/agent-work-orders'] = {
-            target: isDocker ? `http://archon-agent-work-orders:${agentWorkOrdersPort}` : `http://localhost:${agentWorkOrdersPort}`,
-          changeOrigin: true,
-          secure: false,
+            target: isDocker ? `http://abraxas-agent-work-orders:${agentWorkOrdersPort}` : `http://localhost:${agentWorkOrdersPort}`,
+            changeOrigin: true,
+            secure: false,
             timeout: 10000, // 10 second timeout
             configure: (proxy: any, options: any) => {
-              const targetUrl = isDocker ? `http://archon-agent-work-orders:${agentWorkOrdersPort}` : `http://localhost:${agentWorkOrdersPort}`;
-              
+              const targetUrl = isDocker ? `http://abraxas-agent-work-orders:${agentWorkOrdersPort}` : `http://localhost:${agentWorkOrdersPort}`;
+
               // Handle proxy errors (e.g., service is down)
               proxy.on('error', (err: Error, req: any, res: any) => {
-              console.log('🚨 [VITE PROXY ERROR - Agent Work Orders]:', err.message);
-              console.log('🚨 [VITE PROXY ERROR] Target:', targetUrl);
-              console.log('🚨 [VITE PROXY ERROR] Request:', req.url);
-                
+                console.log('🚨 [VITE PROXY ERROR - Agent Work Orders]:', err.message);
+                console.log('🚨 [VITE PROXY ERROR] Target:', targetUrl);
+                console.log('🚨 [VITE PROXY ERROR] Request:', req.url);
+
                 // Send proper error response instead of hanging
                 if (!res.headersSent) {
                   res.writeHead(503, {
@@ -332,11 +332,11 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
                   }));
                 }
               });
-              
+
               // Handle connection timeout
               proxy.on('proxyReq', (proxyReq: any, req: any, res: any) => {
-              console.log('🔄 [VITE PROXY - Agent Work Orders] Forwarding:', req.method, req.url, 'to', `${targetUrl}${req.url}`);
-                
+                console.log('🔄 [VITE PROXY - Agent Work Orders] Forwarding:', req.method, req.url, 'to', `${targetUrl}${req.url}`);
+
                 // Set timeout for the proxy request
                 proxyReq.setTimeout(10000, () => {
                   console.log('⏱️ [VITE PROXY - Agent Work Orders] Request timeout');
@@ -359,7 +359,7 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
         } else {
           console.log('⚠️ [VITE PROXY] Agent Work Orders proxy disabled via AGENT_WORK_ORDERS_ENABLED=false');
         }
-        
+
         // General /api proxy (always enabled, comes after specific routes if agent work orders is enabled)
         proxyConfig['/api'] = {
           target: `http://${proxyHost}:${port}`,
@@ -376,21 +376,21 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
             });
           }
         };
-        
+
         // Health check endpoint proxy
         proxyConfig['/health'] = {
           target: `http://${host}:${port}`,
           changeOrigin: true,
           secure: false
         };
-        
+
         // Socket.IO specific proxy configuration
         proxyConfig['/socket.io'] = {
           target: `http://${host}:${port}`,
           changeOrigin: true,
           ws: true
         };
-        
+
         return proxyConfig;
       })(),
     },
