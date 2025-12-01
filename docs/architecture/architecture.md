@@ -1,119 +1,90 @@
-# Abraxas Architecture
+# Abraxas Architecture V2: Hybrid Extension Model
 
-## 1. Introduction
+## 1. Architectural Overview
 
-**Abraxas** is a high-performance, agentic development platform forked from Archon. While Archon serves as a general-purpose knowledge and task manager, Abraxas is designed to be an **integrated development environment extension** that lives directly within the developer's workflow (VSCode/Antigravity).
+Abraxas adopts a **Hybrid Extension Architecture** to balance User Experience (UX), Development Velocity, and System Stability.
 
-### Core Philosophy
-- **Developer-First**: Lives where the code lives (VSCode Extension).
-- **Agent-Centric**: Agents are first-class citizens with specialized toolsets (Scoped MCPs).
-- **Model-Agnostic**: Universal LLM support via LiteLLM.
-- **Performance**: Optimized context windows and isolated environments.
+*   **Frontend (The "Face"):** A native VSCode Extension leveraging React (Vite) for a premium, responsive, and integrated UI.
+*   **Backend (The "Muscle"):** A managed Docker Compose stack encapsulating the complex Python AI/ML environment, ensuring stability and reproducibility.
 
-## 2. System Overview
-
-Abraxas transitions from a standalone web application to a hybrid **VSCode Extension + Microservices** architecture.
+### High-Level Diagram
 
 ```mermaid
 graph TD
-    subgraph "VSCode / Antigravity IDE"
-        Ext[Abraxas Extension]
-        Panel[Side Panel UI]
-        Webview[Main UI Webview]
+    subgraph VSCode_IDE
+        ExtensionHost[Extension Host (Node.js)]
+        WebView[WebView UI (React/Vite)]
     end
 
-    subgraph "Abraxas Core (Docker)"
-        LiteLLM[LiteLLM Proxy]
-        Server[Abraxas Server]
-        MCP[Scoped MCP Router]
-        DB[(Supabase)]
+    subgraph Docker_Runtime
+        API[Archon Server (FastAPI)]
+        MCP[MCP Server]
+        Agents[Agents Service]
+        DB[(Supabase/Postgres)]
     end
 
-    Ext <-->|HTTP/WebSocket| Server
-    Ext <-->|IFrame Message| Webview
-    Server <--> LiteLLM
-    Server <--> DB
-    MCP <--> Server
+    WebView -- "HTTP / WebSockets" --> API
+    ExtensionHost -- "Docker CLI Control" --> Docker_Runtime
+    ExtensionHost -- "IPC (PostMessage)" --> WebView
 ```
 
-## 3. Key Architectural Changes
+## 2. Component Detail
 
-### 3.1 Rebranding & Isolation (Goals 1 & 2)
-- **Namespace**: All artifacts, docker containers, and environment variables will be prefixed with `abraxas-` to ensure zero conflict with existing Archon installations.
-- **Ports**: A new port range will be assigned (e.g., 9000-9100) to allow simultaneous execution with Archon.
+### A. VSCode Extension (Frontend)
+*   **Tech Stack:** TypeScript, React, Vite, TailwindCSS, Shadcn UI, Framer Motion.
+*   **Responsibility:**
+    *   Rendering the UI (Management Console & Sidebar).
+    *   Handling IDE interactions (opening files, reading selection).
+    *   Managing the Docker Lifecycle (Start/Stop/Check status).
+*   **Design System ("Neon Hex"):**
+    *   **Theme:** Deep Dark Mode.
+    *   **Shape Language:** Hexagonal elements for Agents and Nodes.
+    *   **Effects:** Subtle glows, glassmorphism, smooth transitions.
 
-### 3.2 LiteLLM Integration (Goal 3)
-- **Gateway Pattern**: The `abraxas-server` will no longer communicate directly with OpenAI/Anthropic.
-- **Proxy Container**: A dedicated `litellm` container will handle all LLM traffic.
-- **Benefits**:
-    - Unified API format (OpenAI-compatible) for all models.
-    - Centralized rate limiting and cost tracking.
-    - Failover redundancy.
+### B. Docker Backend (Core Logic)
+*   **Tech Stack:** Python 3.12, FastAPI, PydanticAI, Crawl4AI, PostgreSQL (pgvector).
+*   **Responsibility:**
+    *   RAG Operations (Embeddings, Vector Search).
+    *   Agent Orchestration (BMad Logic).
+    *   Web Crawling.
+    *   MCP Server hosting.
+*   **Communication:**
+    *   Exposes REST API on `localhost:8181`.
+    *   Exposes WebSockets on `localhost:8181/socket.io`.
 
-### 3.3 VSCode / Antigravity Integration (Goals 4 & 5)
-- **Extension Host**: A new TypeScript-based VSCode Extension will serve as the client.
-- **Webview UI**: The existing React frontend (`archon-ui-main`) will be adapted to run within a VSCode Webview.
-    - *Challenge*: Handling routing and deep links within a webview.
-    - *Solution*: Use `MemoryRouter` or a custom bridge for navigation.
-- **Side Panel**: A lightweight view for quick agent access and prompt management, implemented as a VSCode WebviewView.
+## 3. Communication Layer
 
-### 3.4 Dynamic Agent & Scoped MCPs (Goals 6 & 7)
-- **The Problem**: Global MCP servers pollute the context window with irrelevant tools.
-- **The Solution**: **Context-Aware MCP Routing**.
-    - The `abraxas-mcp` server will expose dynamic endpoints: `/mcp/{agent_id}`.
-    - Each endpoint filters the available tools based on the Agent's manifest.
-    - **Example**:
-        - `BackendAgent` sees: `database_tool`, `api_tool`.
-        - `FrontendAgent` sees: `figma_tool`, `component_tool`.
-        - `GeneralAgent` sees: `search_tool`.
+### 1. Extension <-> Backend
+*   **Protocol:** Standard HTTP REST & WebSockets.
+*   **Transport:** Localhost networking (No Docker Bridge complexity required for host-to-container).
+*   **Security:** API Key authentication (generated/managed by the extension).
 
-### 3.5 Scrum & Task Management (Goal 8)
-- **Data Model Enhancements**:
-    - `sprints` table: Start/End dates, Goals.
-    - `story_points` column in tasks.
-    - `burndown_snapshots` table: Daily tracking of remaining points.
-- **Visualization**: New "Sprint Board" and "Analytics" views in the Main UI.
+### 2. Extension <-> WebView
+*   **Protocol:** `vscode.postMessage` RPC.
+*   **Use Case:** WebView requests IDE actions (e.g., "Open this file", "Get current selection").
 
-## 4. Component Architecture
+## 4. Data Strategy
 
-### 4.1 Abraxas Server (`python/src/server`)
-- **Role**: Orchestrator.
-- **Changes**:
-    - Update `config.py` to support LiteLLM base URLs.
-    - Add `AgentManager` service to handle dynamic agent definitions.
+### Local-First (Free Tier)
+*   **Primary Store:** PostgreSQL inside Docker (Volume mounted to user's project or global extension storage).
+*   **Vector Store:** `pgvector` inside the same Postgres instance.
 
-### 4.2 Abraxas MCP (`python/src/mcp_server`)
-- **Role**: Tool Provider.
-- **Changes**:
-    - Refactor `FastMCP` implementation to support multiple instances or dynamic tool filtering.
-    - Implement "Tool Scopes" metadata.
-
-### 4.3 Abraxas Frontend (`archon-ui-main`)
-- **Role**: User Interface.
-- **Changes**:
-    - **Agent Creator UI**: Drag-and-drop interface for defining agents and assigning MCP scopes.
-    - **Scrum Dashboard**: Burndown charts and sprint planning views.
-    - **VSCode Bridge**: Abstraction layer for communicating with the VSCode extension host.
+### Cloud Extension (Premium - Future)
+*   **Switchable Adapter:** The backend can be configured to point to a remote Supabase instance instead of the local Docker container for team sync and cloud features.
 
 ## 5. Implementation Roadmap
 
-1.  **Foundation**: Rename & Dockerize (Parallel with Archon).
-2.  **Backend Core**: Integrate LiteLLM & Refactor MCP Server.
-3.  **Extension**: Build the VSCode Extension shell.
-4.  **UI Migration**: Port React app to Webview.
-5.  **Advanced Features**: Scrum & Agent Creator.
+### Phase 1: The Shell
+1.  Scaffold a new VSCode Extension project structure within the monorepo.
+2.  Migrate `apps/frontend` (Next.js) to `packages/ui-webview` (Vite).
+3.  Implement the "Docker Manager" logic in the Extension Host to verify/start containers.
 
-## 6. Feasibility Assessment
+### Phase 2: The UI Overhaul
+1.  Implement "Neon Hex" Design System.
+2.  Replace standard Shadcn components with custom Hexagonal variants where appropriate.
+3.  Build the Sidebar "Operations Center".
 
-| Goal | Feasibility | Complexity | Strategy |
-|------|-------------|------------|----------|
-| Rebranding | High | Low | Global Search/Replace |
-| Docker Isolation | High | Low | Rename services & ports |
-| LiteLLM | High | Low | Add container, update config |
-| VSCode UI | High | Medium | Webview bridge implementation |
-| Side Panel | High | Medium | New VSCode View provider |
-| Agent Creator | High | Medium | New DB tables & UI forms |
-| Scoped MCPs | High | High | Dynamic MCP routing logic |
-| Scrum | High | Medium | Standard CRUD + Charting |
-
-**Conclusion**: The proposed "Abraxas" architecture is technically sound and achievable. The shift to a VSCode Extension model provides the requested "first-class citizen" experience, while the backend improvements (LiteLLM, Scoped MCPs) address the scalability and context limits.
+### Phase 3: The Integration
+1.  Connect WebView to Localhost Backend.
+2.  Implement Agent Chat interface in Sidebar.
+3.  Test full E2E flow (Create Agent -> Run Task -> See Result).
